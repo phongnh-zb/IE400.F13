@@ -1,22 +1,21 @@
+# configs/config.py
 import os
 
-# Lấy đường dẫn gốc của dự án
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# --- CẤU HÌNH HDFS (Dùng cho Pipeline tự động) ---
+# Địa chỉ HDFS mặc định
+HDFS_NAMENODE = "hdfs://localhost:9000"
 
-# --- SỬA LỖI TẠI ĐÂY ---
-# Thêm tiền tố "file://" để Spark biết đây là file trên ổ cứng, không phải HDFS
+# Đường dẫn Input (Nơi setup_hdfs.sh đã upload file lên)
+HDFS_BASE_PATH = f"{HDFS_NAMENODE}/user/ie400/oulad_raw/"
 
-# 1. Đường dẫn Input (Folder data chứa CSV)
-RAW_DATA_PATH = "file://" + os.path.join(BASE_DIR, "data") + "/raw/"
+# Đường dẫn Output (Nơi etl_job.py sẽ lưu file sau xử lý)
+HDFS_OUTPUT_PATH = f"{HDFS_NAMENODE}/user/ie400/oulad_processed/"
 
-# 2. Đường dẫn Output (Folder processed chứa Parquet)
-PROCESSED_DATA_PATH = "file://" + os.path.join(BASE_DIR, "data", "processed") + "/"
-
-# Tên các file CSV
+# Tên các file
 FILE_STUDENT_INFO = "studentInfo.csv"
 FILE_STUDENT_VLE = "studentVle.csv"
 FILE_STUDENT_ASSESSMENT = "studentAssessment.csv"
 
-# Cấu hình Spark
-APP_NAME = "OULAD_Local_Processing"
+# Spark Config
+APP_NAME = "OULAD_Pipeline"
 MASTER = "local[*]"

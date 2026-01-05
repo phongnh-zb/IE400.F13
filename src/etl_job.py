@@ -1,3 +1,4 @@
+# src/etl_job.py
 import os
 import sys
 
@@ -14,32 +15,36 @@ from src.utils import get_spark_session
 
 def main():
     spark = get_spark_session(config.APP_NAME, config.MASTER)
+    spark.sparkContext.setLogLevel("ERROR")
     
-    # --- SỬA ĐỔI: Đọc từ đường dẫn Local ---
-    print(f">>> Reading RAW data from: {config.RAW_DATA_PATH}")
-    
-    df_info = spark.read.csv(config.RAW_DATA_PATH + config.FILE_STUDENT_INFO, header=True, inferSchema=True)
-    df_vle = spark.read.csv(config.RAW_DATA_PATH + config.FILE_STUDENT_VLE, header=True, inferSchema=True)
-    df_assess = spark.read.csv(config.RAW_DATA_PATH + config.FILE_STUDENT_ASSESSMENT, header=True, inferSchema=True)
+    # 1. Đọc dữ liệu từ HDFS
+    print(f">>> [ETL] Reading RAW data from: {config.HDFS_BASE_PATH}")
+    try:
+        df_info = spark.read.csv(config.HDFS_BASE_PATH + config.FILE_STUDENT_INFO, header=True, inferSchema=True)
+        df_vle = spark.read.csv(config.HDFS_BASE_PATH + config.FILE_STUDENT_VLE, header=True, inferSchema=True)
+        df_assess = spark.read.csv(config.HDFS_BASE_PATH + config.FILE_STUDENT_ASSESSMENT, header=True, inferSchema=True)
+    except Exception as e:
+        print(f">>> LỖI: Không tìm thấy file trên HDFS. Bạn đã chạy ./scripts/setup_hdfs.sh chưa?")
+        raise e
 
-    # ... (Phần logic xử lý: Aggregating, Labeling, Joining GIỮ NGUYÊN KHÔNG ĐỔI) ...
-    # Bạn copy lại đoạn logic xử lý ở các câu trả lời trước vào đây
-    # Logic: df_clicks = ..., df_scores = ..., df_final = ...
-    
-    # (Để ngắn gọn mình viết tắt đoạn logic xử lý, bạn giữ nguyên code cũ nhé)
-    print(">>> Processing data (Aggregating & Joining)...")
+    # 2. Xử lý (Logic giữ nguyên)
+    print(">>> [ETL] Processing data...")
     df_clicks = df_vle.groupBy("id_student").agg(_sum("sum_click").alias("total_clicks"))
     df_scores = df_assess.groupBy("id_student").agg(_avg("score").alias("avg_score"))
-    df_labeled = df_info.withColumn("label", when(col("final_result").isin("Pass", "Distinction"), 0).otherwise(1))
     
+    df_labeled = df_info.withColumn("label", 
+        when(col("final_result").isin("Pass", "Distinction"), 0)
+        .otherwise(1)
+    )
+
     df_final = df_labeled.join(df_clicks, "id_student", "left") \
                          .join(df_scores, "id_student", "left") \
                          .fillna(0, subset=["total_clicks", "avg_score"])
 
-    # --- SỬA ĐỔI: Lưu xuống folder Local 'data/processed' ---
-    print(f">>> Saving PROCESSED data to: {config.PROCESSED_DATA_PATH}")
-    df_final.write.mode("overwrite").parquet(config.PROCESSED_DATA_PATH)
-    print(">>> ETL Finished Successfully!")
+    # 3. Lưu xuống HDFS (Ghi đè)
+    print(f">>> [ETL] Saving PROCESSED data to: {config.HDFS_OUTPUT_PATH}")
+    df_final.write.mode("overwrite").parquet(config.HDFS_OUTPUT_PATH)
+    print(">>> [ETL] Finished Successfully!")
 
     spark.stop()
 

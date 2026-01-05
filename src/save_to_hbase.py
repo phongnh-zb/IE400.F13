@@ -3,6 +3,7 @@ import sys
 
 import happybase
 
+# Setup đường dẫn import
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from configs import config
@@ -10,28 +11,31 @@ from src.utils import get_spark_session
 
 
 def main():
-    # 1. Đọc dữ liệu từ thư mục Local 'data/processed'
-    spark = get_spark_session("Save_To_HBase_Local", config.MASTER)
-    
-    # Config mới trỏ vào folder data/processed
-    print(f">>> Reading processed data from: {config.PROCESSED_DATA_PATH}")
+    # 1. Khởi tạo Spark
+    spark = get_spark_session("Save_To_HBase_HDFS", config.MASTER)
+    spark.sparkContext.setLogLevel("ERROR")
+
+    # --- SỬA LỖI TẠI ĐÂY ---
+    # Đọc từ HDFS_OUTPUT_PATH thay vì PROCESSED_DATA_PATH
+    print(f">>> [HBASE] Reading processed data from HDFS: {config.HDFS_OUTPUT_PATH}")
     
     try:
-        df = spark.read.parquet(config.PROCESSED_DATA_PATH)
+        df = spark.read.parquet(config.HDFS_OUTPUT_PATH)
     except Exception as e:
-        print(f"LỖI: Không tìm thấy dữ liệu tại {config.PROCESSED_DATA_PATH}")
-        print("Bạn đã chạy 'python3 src/etl_job.py' chưa?")
-        return
+        print(f">>> LỖI: Không tìm thấy dữ liệu trên HDFS tại {config.HDFS_OUTPUT_PATH}")
+        print("Hãy chắc chắn bước ETL đã chạy thành công.")
+        sys.exit(1)
 
-    # Lấy mẫu data để đẩy (Demo 1000 dòng)
+    # Lấy mẫu 1000 dòng để đẩy vào HBase (Demo)
     data_to_save = df.select("id_student", "total_clicks", "avg_score", "label").limit(1000).collect()
 
-    print(">>> Connecting to HBase via Thrift...")
+    print(">>> [HBASE] Connecting to HBase via Thrift...")
     try:
-        connection = happybase.Connection('localhost')
+        # Kết nối đến localhost cổng 9090
+        connection = happybase.Connection('localhost', port=9090)
         table = connection.table('student_predictions')
         
-        print(f">>> Writing {len(data_to_save)} records to HBase...")
+        print(f">>> [HBASE] Writing {len(data_to_save)} records...")
         batch = table.batch()
         
         for row in data_to_save:
@@ -44,11 +48,11 @@ def main():
         
         batch.send()
         connection.close()
-        print(">>> SUCCESS: Data saved to HBase!")
+        print(">>> [HBASE] SUCCESS: Data saved to HBase table 'student_predictions'")
         
     except Exception as e:
-        print(f"LỖI KẾT NỐI HBASE: {e}")
-        print("Hãy đảm bảo bạn đã chạy lệnh: hbase thrift start")
+        print(f">>> [HBASE] LỖI KẾT NỐI: {e}")
+        print("Gợi ý: Hãy kiểm tra xem Thrift Server đã bật chưa (hbase thrift start)")
 
     spark.stop()
 
