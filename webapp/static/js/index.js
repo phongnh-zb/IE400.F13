@@ -60,11 +60,11 @@ function updateDashboard(data) {
   // Chuẩn bị dữ liệu: x=Score, y=Clicks
   const scatterDataRisk = data.raw_data
     .filter((d) => d.risk === 1)
-    .map((d) => ({ x: d.score, y: d.clicks }));
+    .map((d) => ({ x: d.score, y: d.clicks, id: d.id }));
 
   const scatterDataSafe = data.raw_data
     .filter((d) => d.risk === 0)
-    .map((d) => ({ x: d.score, y: d.clicks }));
+    .map((d) => ({ x: d.score, y: d.clicks, id: d.id }));
 
   const ctxScatter = document.getElementById("scatterChart").getContext("2d");
 
