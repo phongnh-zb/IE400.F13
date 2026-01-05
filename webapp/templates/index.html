@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Edu-Monitoring Realtime Dashboard</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        background-color: #f8f9fa;
+      }
+      .card {
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      .risk-alert {
+        color: #dc3545;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid p-4">
+      <h2 class="text-center mb-4">
+        🎓 HỆ THỐNG GIÁM SÁT SINH VIÊN (BIG DATA MOCK)
+      </h2>
+
+      <div class="row text-center">
+        <div class="col-md-4">
+          <div class="card p-3 border-primary">
+            <h5>Tổng sinh viên giám sát</h5>
+            <h2 id="total-count">0</h2>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card p-3 border-danger">
+            <h5>Nguy cơ bỏ học (Risk)</h5>
+            <h2 id="risk-count" class="text-danger">0</h2>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card p-3 border-success">
+            <h5>Học tập bình thường</h5>
+            <h2 id="safe-count" class="text-success">0</h2>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mt-4">
+        <div class="col-md-6">
+          <div class="card p-3">
+            <h5 class="text-center">Tỉ lệ Nguy cơ Bỏ học</h5>
+            <canvas id="riskPieChart"></canvas>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card p-3">
+            <h5 class="text-center">Phân tích: Điểm số vs Số Click</h5>
+            <canvas id="scatterChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Khởi tạo biến Chart toàn cục
+      let pieChart, scatterChart;
+
+      async function fetchData() {
+        try {
+          const response = await fetch("/api/realtime-data");
+          const result = await response.json();
+          updateDashboard(result);
+        } catch (error) {
+          console.error("Lỗi lấy dữ liệu:", error);
+        }
+      }
+
+      function updateDashboard(data) {
+        // 1. Cập nhật số liệu thống kê
+        document.getElementById("total-count").innerText = data.summary.total;
+        document.getElementById("risk-count").innerText = data.summary.risk;
+        document.getElementById("safe-count").innerText = data.summary.safe;
+
+        // 2. Cập nhật Pie Chart (Tròn)
+        const ctxPie = document.getElementById("riskPieChart").getContext("2d");
+        if (pieChart) pieChart.destroy(); // Xóa cũ vẽ mới
+
+        pieChart = new Chart(ctxPie, {
+          type: "doughnut",
+          data: {
+            labels: ["Nguy cơ", "An toàn"],
+            datasets: [
+              {
+                data: [data.summary.risk, data.summary.safe],
+                backgroundColor: ["#dc3545", "#28a745"],
+              },
+            ],
+          },
+        });
+
+        // 3. Cập nhật Scatter Chart (Điểm phân tán)
+        // Chuẩn bị dữ liệu cho Scatter: x=Score, y=Clicks
+        const scatterDataRisk = data.raw_data
+          .filter((d) => d.risk === 1)
+          .map((d) => ({ x: d.score, y: d.clicks }));
+        const scatterDataSafe = data.raw_data
+          .filter((d) => d.risk === 0)
+          .map((d) => ({ x: d.score, y: d.clicks }));
+
+        const ctxScatter = document
+          .getElementById("scatterChart")
+          .getContext("2d");
+        if (scatterChart) scatterChart.destroy();
+
+        scatterChart = new Chart(ctxScatter, {
+          type: "scatter",
+          data: {
+            datasets: [
+              {
+                label: "Nguy cơ bỏ học",
+                data: scatterDataRisk,
+                backgroundColor: "#dc3545",
+              },
+              {
+                label: "Học tốt",
+                data: scatterDataSafe,
+                backgroundColor: "#28a745",
+              },
+            ],
+          },
+          options: {
+            scales: {
+              x: { title: { display: true, text: "Điểm trung bình (Score)" } },
+              y: { title: { display: true, text: "Tổng số Click" } },
+            },
+          },
+        });
+      }
+
+      // Chạy lần đầu
+      fetchData();
+
+      // Tự động refresh mỗi 5 giây (Real-time Simulation)
+      setInterval(fetchData, 5000);
+    </script>
+  </body>
+</html>
