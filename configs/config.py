@@ -1,6 +1,8 @@
 # configs/config.py
 import os
 
+JAVA_17_HOME = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+
 # --- CẤU HÌNH HDFS (Dùng cho Pipeline tự động) ---
 # Địa chỉ HDFS mặc định
 HDFS_NAMENODE = "hdfs://localhost:9000"

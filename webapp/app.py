@@ -1,138 +1,138 @@
+import logging
 import math
+import threading
+import time
 
 import happybase
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
-# HBase Config
+# --- CONFIG ---
+logging.basicConfig(level=logging.INFO)
+logger = app.logger
+
 HBASE_HOST = 'localhost'
 HBASE_PORT = 9090
 TABLE_NAME = 'student_predictions'
+CACHE_INTERVAL = 600  # 10 phút (600 giây)
 
-def get_hbase_data(limit=None):
-    """
-    Hàm lấy dữ liệu từ HBase.
-    - limit=None: Lấy TOÀN BỘ dữ liệu (Full Scan).
-    - limit=Number: Lấy giới hạn số dòng.
-    """
-    data = []
-    connection = None
-    try:
-        # Kết nối với timeout lâu hơn một chút vì load nhiều dữ liệu
-        connection = happybase.Connection(host=HBASE_HOST, port=HBASE_PORT, timeout=10000)
-        connection.open()
-        table = connection.table(TABLE_NAME)
-        
-        print(f"DEBUG: Đang quét HBase (Limit: {limit})...")
-        
-        # Scan HBase
-        # Nếu limit=None, happybase sẽ scan hết bảng
-        scanner = table.scan(limit=limit)
-        
-        for key, value in scanner:
-            try:
-                # Decode dữ liệu
-                student_id = key.decode('utf-8')
-                clicks = float(value.get(b'info:clicks', b'0'))
-                score = float(value.get(b'info:avg_score', b'0'))
-                risk_val = value.get(b'prediction:risk_label', b'0')
-                risk = int(risk_val)
-                
-                data.append({
-                    'id': student_id,
-                    'clicks': clicks,
-                    'score': score,
-                    'risk': risk
-                })
-            except Exception as row_error:
-                print(f"Lỗi đọc dòng {key}: {row_error}")
-                continue
-                
-        print(f"DEBUG: Đã tải xong {len(data)} dòng.")
-        
-    except Exception as e:
-        print(f"LỖI KẾT NỐI HBASE: {e}")
-    finally:
-        if connection:
-            connection.close()
-            
-    return data
+# --- GLOBAL CACHE (BỘ NHỚ ĐỆM) ---
+# Biến này sẽ lưu toàn bộ dữ liệu trong RAM
+SYSTEM_CACHE = {
+    "data": [],         # Danh sách sinh viên
+    "last_updated": None,
+    "is_ready": False   # Cờ báo hiệu cache đã tải xong lần đầu chưa
+}
 
-def get_hbase_paginated(page=1, page_size=50, search_query=""):
+def fetch_all_data_from_hbase():
     """
-    Phân trang Server-side có đếm tổng số lượng bản ghi.
+    Hàm này chạy NGẦM (Background).
+    Nhiệm vụ: Quét toàn bộ HBase và lưu vào RAM.
     """
-    data = []
     connection = None
-    total_records = 0
-    total_pages = 0
+    data_buffer = []
     
     try:
-        connection = happybase.Connection(host=HBASE_HOST, port=HBASE_PORT, timeout=10000)
+        logger.info(">>> [CACHE] Bắt đầu đồng bộ dữ liệu từ HBase...")
+        start_time = time.time()
+        
+        # Kết nối HBase (Timeout cao vì chạy ngầm, không sợ user chờ)
+        connection = happybase.Connection(host=HBASE_HOST, port=HBASE_PORT, timeout=60000)
         connection.open()
         table = connection.table(TABLE_NAME)
         
-        # BƯỚC 1: LẤY DANH SÁCH TẤT CẢ KEYS (ID) KHỚP ĐIỀU KIỆN
-        # Chúng ta chỉ quét keys để đếm cho nhanh, chưa lấy dữ liệu chi tiết
-        all_matching_keys = []
-        
-        # scan() trả về generator, chúng ta duyệt qua để lọc ID
-        # Sử dụng columns=[] để chỉ lấy RowKey (tối ưu tốc độ) hoặc lấy 1 cột nhỏ
-        for key, _ in table.scan(columns=[b'prediction:risk_label']):
-            student_id = key.decode('utf-8')
-            
-            # Lọc theo Search Query (nếu có)
-            if search_query and search_query.lower() not in student_id.lower():
-                continue
-                
-            all_matching_keys.append(student_id)
-            
-        # BƯỚC 2: TÍNH TOÁN PHÂN TRANG
-        total_records = len(all_matching_keys)
-        if total_records > 0:
-            total_pages = math.ceil(total_records / page_size)
-        else:
-            total_pages = 1
-
-        # Đảm bảo trang hiện tại hợp lệ
-        if page < 1: page = 1
-        if page > total_pages: page = total_pages
-
-        # Xác định chỉ số bắt đầu và kết thúc (Slicing)
-        start_index = (page - 1) * page_size
-        end_index = start_index + page_size
-        
-        # Cắt lấy danh sách ID của trang hiện tại
-        page_keys = all_matching_keys[start_index:end_index]
-        
-        # BƯỚC 3: TRUY VẤN CHI TIẾT (GET BATCH)
-        # Chỉ lấy dữ liệu đầy đủ cho các ID trong trang này
-        if page_keys:
-            # Chuyển đổi string ID về bytes để query HBase
-            keys_as_bytes = [k.encode('utf-8') for k in page_keys]
-            rows = table.rows(keys_as_bytes)
-            
-            # table.rows trả về list tuple (key, data), ta map lại vào dict
-            for key, value in rows:
-                data.append({
+        # Quét toàn bộ bảng (Full Scan)
+        # Vì chạy ngầm nên ta có thể thoải mái lấy hết dữ liệu
+        for key, value in table.scan():
+            try:
+                data_buffer.append({
                     'id': key.decode('utf-8'),
                     'clicks': float(value.get(b'info:clicks', b'0')),
                     'score': float(value.get(b'info:avg_score', b'0')),
                     'risk': int(value.get(b'prediction:risk_label', b'0'))
                 })
+            except Exception:
+                continue
 
+        # Cập nhật vào biến Global
+        SYSTEM_CACHE["data"] = data_buffer
+        SYSTEM_CACHE["last_updated"] = time.strftime("%H:%M:%S")
+        SYSTEM_CACHE["is_ready"] = True
+        
+        duration = time.time() - start_time
+        logger.info(f">>> [CACHE] ✅ Đã cập nhật xong {len(data_buffer)} bản ghi trong {duration:.2f}s.")
+        
     except Exception as e:
-        print(f"HBase Error: {e}")
+        logger.error(f">>> [CACHE] ❌ Lỗi cập nhật Cache: {e}")
     finally:
         if connection: connection.close()
 
+def background_scheduler():
+    """Luồng chạy vĩnh viễn: Cứ 10 phút chạy cập nhật 1 lần"""
+    while True:
+        fetch_all_data_from_hbase()
+        logger.info(f">>> [SCHEDULER] Ngủ {CACHE_INTERVAL} giây trước lần cập nhật tiếp theo...")
+        time.sleep(CACHE_INTERVAL)
+
+# --- KHỞI ĐỘNG LUỒNG CACHE NGAY KHI APP CHẠY ---
+# Daemon=True để luồng tự tắt khi App tắt
+t = threading.Thread(target=background_scheduler, daemon=True)
+t.start()
+
+
+# --- CÁC HÀM XỬ LÝ TRÊN RAM (CỰC NHANH) ---
+def get_data_from_memory(page=1, page_size=50, search_query="", sort_by="id", order="asc"):
+    """
+    Hàm xử lý logic dữ liệu trong RAM:
+    1. Search -> 2. Sort -> 3. Paginate
+    """
+    # 1. Lấy dữ liệu thô từ Cache
+    if not SYSTEM_CACHE["is_ready"]:
+        return {'data': [], 'total_pages': 0, 'total_records': 0, 'page': 1}
+
+    all_data = SYSTEM_CACHE["data"]
+    
+    # 2. FILTER (Tìm kiếm)
+    if search_query:
+        q = search_query.lower()
+        # Tìm trong ID hoặc Risk Label (nếu muốn)
+        filtered_data = [x for x in all_data if q in x['id'].lower()]
+    else:
+        filtered_data = list(all_data) # Copy list để không ảnh hưởng Cache gốc
+
+    # 3. SORT (Sắp xếp)
+    # sort_by: 'id', 'clicks', 'score', 'risk'
+    # order: 'asc', 'desc'
+    reverse = (order == 'desc')
+    
+    try:
+        # Sử dụng lambda để chọn key sắp xếp
+        filtered_data.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse)
+    except Exception as e:
+        logger.error(f"Lỗi sort: {e}")
+
+    # 4. PAGINATION (Phân trang)
+    total_records = len(filtered_data)
+    total_pages = math.ceil(total_records / page_size) if total_records > 0 else 1
+    
+    # Validate trang
+    if page < 1: page = 1
+    if page > total_pages: page = total_pages
+    
+    start = (page - 1) * page_size
+    end = start + page_size
+    
+    paginated_data = filtered_data[start:end]
+    
     return {
-        'data': data,
-        'total_records': total_records,
+        'data': paginated_data,
+        'page': page,
         'total_pages': total_pages,
-        'current_page': page
+        'total_records': total_records
     }
+
+# --- ROUTES ---
 
 @app.route('/')
 def index():
@@ -140,42 +140,61 @@ def index():
 
 @app.route('/students')
 def students():
-    # Mặc định page_size là 50 theo yêu cầu
+    if not SYSTEM_CACHE["is_ready"]:
+        return render_template('loading.html')
+
+    # Lấy tham số từ URL
     page = request.args.get('page', 1, type=int)
     page_size = request.args.get('page_size', 50, type=int)
     search = request.args.get('search', '', type=str)
+    
+    # Tham số mới cho Sorting
+    sort_by = request.args.get('sort_by', 'id', type=str)   # Mặc định sort theo ID
+    order = request.args.get('order', 'asc', type=str)      # Mặc định tăng dần
 
     # Gọi hàm xử lý
-    result = get_hbase_paginated(page, page_size, search)
+    result = get_data_from_memory(page, page_size, search, sort_by, order)
     
     return render_template(
         'students.html', 
         students=result['data'],
-        page=result['current_page'],
-        page_size=page_size,
-        search=search,
+        
+        # Pagination Params
+        page=result['page'],
         total_pages=result['total_pages'],
-        total_records=result['total_records']
+        total_records=result['total_records'],
+        page_size=page_size,
+        
+        # Filter/Sort Params (Để giữ trạng thái trên UI)
+        search=search,
+        sort_by=sort_by,
+        order=order,
+        
+        last_updated=SYSTEM_CACHE["last_updated"]
     )
 
 @app.route('/api/realtime-data')
 def realtime_data():
-    """API cho biểu đồ"""
-    # Biểu đồ cũng nên vẽ hết để chính xác, hoặc limit lớn (vd: 10000)
-    data = get_hbase_data(limit=None)
+    """API Dashboard: Lấy ngay từ RAM"""
+    if not SYSTEM_CACHE["is_ready"]:
+        return jsonify({'raw_data': [], 'summary': {'total':0, 'risk':0, 'safe':0}})
+
+    data_sample = SYSTEM_CACHE["data"]
     
-    total = len(data)
-    risk = sum(1 for x in data if x['risk'] == 1)
+    total = len(data_sample)
+    risk = sum(1 for x in data_sample if x['risk'] == 1)
     safe = total - risk
     
     return jsonify({
-        'raw_data': data,
+        'raw_data': data_sample,
         'summary': {
-            'total': total,
+            'total': len(SYSTEM_CACHE["data"]), # Tổng toàn bộ DB
             'risk': risk,
-            'safe': safe
+            'safe': safe,
+            'last_updated': SYSTEM_CACHE["last_updated"]
         }
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # use_reloader=False để tránh chạy 2 luồng background
+    app.run(debug=True, port=5001, use_reloader=False)

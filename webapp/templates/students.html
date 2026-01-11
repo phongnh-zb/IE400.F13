@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Student List - Pagination</title>
+    <title>Student List - Full Features</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'); body { font-family: 'Inter', sans-serif; }</style>
@@ -20,22 +20,29 @@
     </nav>
 
     <main class="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
+        
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-2xl font-bold text-gray-800">Server-Side Pagination</h2>
-                    <p class="text-sm text-gray-500">Total Records: <span class="font-bold text-blue-600">{{ total_records }}</span> students</p>
+                    <h2 class="text-2xl font-bold text-gray-800">Dữ liệu Sinh viên</h2>
+                    <p class="text-sm text-gray-500">
+                        Cập nhật lúc: <span class="font-bold text-blue-600">{{ last_updated }}</span> 
+                        | Tổng: <span class="font-bold">{{ total_records }}</span> bản ghi
+                    </p>
                 </div>
 
                 <form action="/students" method="GET" class="flex gap-2 w-full md:w-auto">
                     <input type="hidden" name="page_size" value="{{ page_size }}">
+                    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                    <input type="hidden" name="order" value="{{ order }}">
+                    
                     <div class="relative w-full">
                         <input type="text" name="search" value="{{ search }}" 
                                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
-                               placeholder="Search ID...">
+                               placeholder="Tìm ID sinh viên...">
                         <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                     </div>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Search</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Tìm</button>
                 </form>
             </div>
         </div>
@@ -45,10 +52,45 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-100">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Student ID</th>
-                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Clicks</th>
-                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Score</th>
-                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Prediction</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                                onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=id&order={{ 'desc' if sort_by == 'id' and order == 'asc' else 'asc' }}'">
+                                Student ID
+                                {% if sort_by == 'id' %}
+                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
+                                {% endif %}
+                            </th>
+
+                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                                onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=clicks&order={{ 'desc' if sort_by == 'clicks' and order == 'asc' else 'asc' }}'">
+                                Clicks
+                                {% if sort_by == 'clicks' %}
+                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
+                                {% endif %}
+                            </th>
+
+                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                                onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=score&order={{ 'desc' if sort_by == 'score' and order == 'asc' else 'asc' }}'">
+                                Score
+                                {% if sort_by == 'score' %}
+                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
+                                {% endif %}
+                            </th>
+
+                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                                onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=risk&order={{ 'desc' if sort_by == 'risk' and order == 'asc' else 'asc' }}'">
+                                Prediction
+                                {% if sort_by == 'risk' %}
+                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
+                                {% endif %}
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -64,15 +106,15 @@
                             </td>
                             <td class="px-6 py-4 text-center">
                                 {% if st.risk == 1 %}
-                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">High Risk</span>
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Nguy cơ</span>
                                 {% else %}
-                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Safe</span>
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">An toàn</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="px-6 py-10 text-center text-gray-500">No students found matching your criteria.</td>
+                            <td colspan="4" class="px-6 py-10 text-center text-gray-500">Không tìm thấy dữ liệu.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -82,53 +124,53 @@
             <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                 
                 <div class="flex items-center text-sm text-gray-700">
-                    <span class="mr-2">Show</span>
-                    <select onchange="changePageSize(this.value)" class="border-gray-300 border rounded py-1 px-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <span class="mr-2">Hiển thị</span>
+                    <select onchange="changeParams('page_size', this.value)" class="border-gray-300 border rounded py-1 px-2 cursor-pointer focus:outline-none">
                         <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
                         <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
                         <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
                         <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
                     </select>
-                    <span class="ml-2">rows</span>
                 </div>
 
                 <span class="text-sm text-gray-600">
-                    Page <span class="font-bold text-gray-900">{{ page }}</span> of <span class="font-bold text-gray-900">{{ total_pages }}</span>
+                    Trang <span class="font-bold text-gray-900">{{ page }}</span> / <span class="font-bold text-gray-900">{{ total_pages }}</span>
                 </span>
 
-                <div class="inline-flex rounded-md shadow-sm">
-                    {% if page > 1 %}
-                    <a href="/students?page={{ page - 1 }}&page_size={{ page_size }}&search={{ search }}" 
-                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-l hover:bg-gray-50">
-                        <i class="fas fa-chevron-left mr-1"></i> Prev
+                <div class="inline-flex rounded-md shadow-sm isolate">
+                    <a href="{{ '/students?page=1&page_size=' ~ page_size ~ '&search=' ~ search ~ '&sort_by=' ~ sort_by ~ '&order=' ~ order }}" 
+                       class="relative inline-flex items-center px-3 py-2 text-gray-400 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 {{ 'pointer-events-none opacity-50' if page == 1 }}">
+                        <span class="sr-only">First</span>
+                        <i class="fas fa-angle-double-left"></i>
                     </a>
-                    {% else %}
-                    <button disabled class="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-300 rounded-l cursor-not-allowed">
-                        <i class="fas fa-chevron-left mr-1"></i> Prev
-                    </button>
-                    {% endif %}
 
-                    {% if page < total_pages %}
-                    <a href="/students?page={{ page + 1 }}&page_size={{ page_size }}&search={{ search }}" 
-                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-r hover:bg-gray-50">
-                        Next <i class="fas fa-chevron-right ml-1"></i>
+                    <a href="{{ '/students?page=' ~ (page - 1) ~ '&page_size=' ~ page_size ~ '&search=' ~ search ~ '&sort_by=' ~ sort_by ~ '&order=' ~ order }}" 
+                       class="relative inline-flex items-center px-3 py-2 text-gray-700 bg-white border-t border-b border-r border-gray-300 hover:bg-gray-50 {{ 'pointer-events-none opacity-50' if page == 1 }}">
+                        Trước
                     </a>
-                    {% else %}
-                    <button disabled class="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-300 rounded-r cursor-not-allowed">
-                        Next <i class="fas fa-chevron-right ml-1"></i>
-                    </button>
-                    {% endif %}
+
+                    <a href="{{ '/students?page=' ~ (page + 1) ~ '&page_size=' ~ page_size ~ '&search=' ~ search ~ '&sort_by=' ~ sort_by ~ '&order=' ~ order }}" 
+                       class="relative inline-flex items-center px-3 py-2 text-gray-700 bg-white border-t border-b border-l border-gray-300 hover:bg-gray-50 {{ 'pointer-events-none opacity-50' if page == total_pages }}">
+                        Sau
+                    </a>
+
+                    <a href="{{ '/students?page=' ~ total_pages ~ '&page_size=' ~ page_size ~ '&search=' ~ search ~ '&sort_by=' ~ sort_by ~ '&order=' ~ order }}" 
+                       class="relative inline-flex items-center px-3 py-2 text-gray-400 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 {{ 'pointer-events-none opacity-50' if page == total_pages }}">
+                        <span class="sr-only">Last</span>
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
                 </div>
             </div>
         </div>
     </main>
 
     <script>
-        function changePageSize(size) {
-            const urlParams = new URLSearchParams(window.location.search);
-            const currentSearch = urlParams.get('search') || '';
-            // Reset về trang 1 khi đổi page size
-            window.location.href = `/students?page=1&page_size=${size}&search=${currentSearch}`;
+        // Hàm tiện ích để đổi Page Size mà giữ nguyên các tham số khác
+        function changeParams(key, value) {
+            const url = new URL(window.location.href);
+            url.searchParams.set(key, value);
+            url.searchParams.set('page', 1); // Reset về trang 1 khi đổi size
+            window.location.href = url.toString();
         }
     </script>
 </body>

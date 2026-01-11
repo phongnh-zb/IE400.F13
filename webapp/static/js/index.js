@@ -39,7 +39,7 @@ function updateDashboard(data) {
   pieChart = new Chart(ctxPie, {
     type: "doughnut",
     data: {
-      labels: ["Nguy cơ", "An toàn"],
+      labels: ["Risk", "Safe"],
       datasets: [
         {
           data: [data.summary.risk, data.summary.safe],
@@ -50,6 +50,7 @@ function updateDashboard(data) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false, // <--- THÊM DÒNG QUAN TRỌNG NÀY
       plugins: {
         legend: { position: "bottom" },
       },
@@ -77,13 +78,13 @@ function updateDashboard(data) {
     data: {
       datasets: [
         {
-          label: "Nguy cơ bỏ học (Risk)",
+          label: "Risk",
           data: scatterDataRisk,
           backgroundColor: "#dc3545", // Đỏ
           pointRadius: 4,
         },
         {
-          label: "Học tốt (Safe)",
+          label: "Safe",
           data: scatterDataSafe,
           backgroundColor: "#28a745", // Xanh
           pointRadius: 4,
@@ -107,12 +108,12 @@ function updateDashboard(data) {
       },
       scales: {
         x: {
-          title: { display: true, text: "Điểm trung bình (Score)" },
+          title: { display: true, text: "Average Score" },
           min: 0,
           max: 100,
         },
         y: {
-          title: { display: true, text: "Tổng số Click" },
+          title: { display: true, text: "Total Clicks" },
           beginAtZero: true,
         },
       },
