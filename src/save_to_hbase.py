@@ -47,21 +47,24 @@ def main():
         start_time = time.time()
         
         for i, row in enumerate(all_rows):
-            # Tạo Row Key
-            # Lưu ý: Trong thực tế OULAD, 1 sinh viên học nhiều khóa. 
-            # Nếu muốn giữ tất cả, RowKey nên là: id_student + code_module. 
-            # Ở đây ta giữ id_student để đơn giản cho Demo.
             row_key = str(row['id_student']).encode()
             
-            batch.put(row_key, {
-                b'info:clicks': str(row['total_clicks']).encode(),
-                b'info:avg_score': str(row['avg_score']).encode(),
-                b'prediction:risk_label': str(row['label']).encode()
-            })
+            # Lấy giá trị gốc từ Spark
+            clicks = float(row['total_clicks'])
+            score = float(row['avg_score'])
+            risk_label = int(row['label']) # Đây là label do model dự đoán
             
-            # In tiến độ mỗi 2000 dòng
-            if (i + 1) % 2000 == 0:
-                print(f"    -> Đã ghi: {i + 1}/{total_count} dòng...")
+            # --- LOGIC CAN THIỆP (OVERRIDE) ---
+            # Nếu điểm > 90, ép về trạng thái An toàn (0) bất kể Model nói gì
+            if score >= 90.0:
+                risk_label = 0 
+            # ----------------------------------
+
+            batch.put(row_key, {
+                b'info:clicks': str(clicks).encode(),
+                b'info:avg_score': str(score).encode(),
+                b'prediction:risk_label': str(risk_label).encode()
+            })
 
         # Gửi những dòng còn lại trong batch
         batch.send()

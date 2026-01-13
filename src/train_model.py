@@ -33,7 +33,7 @@ def main():
     
     # Demo chạy 1 model GBT (Model tốt nhất) cho nhanh
     print(">>> [TRAIN] Training GBT Classifier...")
-    gbt = GBTClassifier(labelCol="label", featuresCol="features", maxIter=10)
+    gbt = GBTClassifier(labelCol="label", featuresCol="features", maxIter=20, maxDepth=5)
     model = gbt.fit(train_data)
     
     predictions = model.transform(test_data)

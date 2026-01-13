@@ -131,6 +131,21 @@ def get_data_from_memory(page=1, page_size=50, search_query="", sort_by="id", or
         'total_pages': total_pages,
         'total_records': total_records
     }
+    
+def get_student_by_id(student_id):
+    """
+    Find a specific student in the RAM Cache.
+    """
+    if not SYSTEM_CACHE["is_ready"]:
+        return None
+        
+    # Search in the list (Linear search is very fast for 30k items in RAM)
+    # If the list gets huge (1M+), we would convert this to a Dictionary {id: data}
+    for st in SYSTEM_CACHE["data"]:
+        if st['id'] == student_id:
+            return st
+            
+    return None
 
 # --- ROUTES ---
 
@@ -172,6 +187,30 @@ def students():
         
         last_updated=SYSTEM_CACHE["last_updated"]
     )
+    
+@app.route('/api/student/<student_id>')
+def api_student_detail(student_id):
+    """API trả về JSON chi tiết sinh viên cho Modal"""
+    student = get_student_by_id(student_id)
+    
+    if not student:
+        return jsonify({'error': 'Not found'}), 404
+        
+    # Tạo Recommendation Logic (Copy từ logic cũ)
+    recommendations = []
+    if student['risk'] == 1:
+        recommendations.append("Cần liên hệ cố vấn học tập ngay.")
+        recommendations.append("Xem lại log 'Vle' vì tương tác thấp.")
+        recommendations.append("Sắp xếp buổi mentoring 1-1.")
+    else:
+        recommendations.append("Duy trì phong độ hiện tại!")
+        recommendations.append("Khuyến khích tham gia nhóm đôi bạn cùng tiến.")
+
+    # Trả về JSON gộp cả info và recommendation
+    return jsonify({
+        'info': student,
+        'recommendations': recommendations
+    })
 
 @app.route('/api/realtime-data')
 def realtime_data():
