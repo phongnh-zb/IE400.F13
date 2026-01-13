@@ -1,37 +1,29 @@
 #!/bin/bash
 
-# Lấy đường dẫn gốc của dự án
+# Get the project root directory
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "========================================================"
-echo "   BẮT ĐẦU AUTOMATED PIPELINE"
-echo "========================================================"
-
-# 1. Chạy bước ETL (Làm sạch & Feature Engineering)
+# Run ETL Step (Cleaning & Feature Engineering)
 echo ">>> [STEP 1/2] Running ETL Job (etl_job.py)..."
 spark-submit "$PROJECT_ROOT/src/etl_job.py"
 
-# Kiểm tra nếu bước 1 thất bại thì dừng luôn
+# Check if step 1 failed, stop immediately if so
 if [ $? -eq 0 ]; then
-    echo ">>> ETL thành công!"
+    echo ">>> ETL Successful!"
 else
-    echo ">>> LỖI: ETL Job thất bại. Dừng pipeline."
+    echo ">>> ERROR: ETL Job failed. Stopping pipeline."
     exit 1
 fi
 
 echo "--------------------------------------------------------"
 
-# 2. Chạy bước Huấn luyện Model
+# Run Model Training Step
 echo ">>> [STEP 2/2] Running Model Training (train_model.py)..."
 spark-submit "$PROJECT_ROOT/src/train_model.py"
 
 if [ $? -eq 0 ]; then
-    echo ">>> Training thành công!"
+    echo ">>> Training Successful!"
 else
-    echo ">>> LỖI: Training Job thất bại."
+    echo ">>> ERROR: Training Job failed."
     exit 1
 fi
-
-echo "========================================================"
-echo "   PIPELINE HOÀN TẤT XUẤT SẮC"
-echo "========================================================"

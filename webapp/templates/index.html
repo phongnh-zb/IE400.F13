@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Edu-Monitoring Dashboard</title>
+    <title>Student Dropout Prediction System</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -20,54 +20,39 @@
     </style>
   </head>
   <body class="bg-gray-50 text-gray-800">
-    <nav class="bg-gradient-to-r from-blue-800 to-indigo-900 shadow-lg mb-8">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <div class="flex items-center">
-            <a
-              href="/"
-              class="text-white text-xl font-bold tracking-wide flex items-center gap-2"
-            >
-              <i class="fas fa-network-wired"></i> BIG DATA MONITOR
-            </a>
-          </div>
-          <div class="flex space-x-4">
-            <a
-              href="/"
-              class="text-white px-3 py-2 rounded-md text-sm font-medium bg-blue-700 hover:bg-blue-600 transition"
-            >
-              Dashboard
-            </a>
-            <a
-              href="/students"
-              class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
-            >
-              Student List
-            </a>
-          </div>
-        </div>
-      </div>
-    </nav>
+    {% set active_page = 'dashboard' %} {% include 'navbar.html' %}
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between items-center mb-6">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">System Overview</h1>
           <p class="text-sm text-gray-500">
-            Monitoring student activities and forecasting risks.
+            Monitoring student performance and risk forecasting.
           </p>
         </div>
-        <span
-          class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"
-        >
+
+        <div class="flex items-center gap-3">
+          <button
+            id="refreshBtn"
+            onclick="triggerManualRefresh()"
+            class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition shadow-sm"
+          >
+            <i class="fas fa-sync-alt" id="refreshIcon"></i>
+            Refresh Data
+          </button>
+
           <span
-            class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-pulse"
-          ></span>
-          Real-time Active
-        </span>
+            class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-800"
+          >
+            <span
+              class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-pulse"
+            ></span>
+            System Live
+          </span>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div
           class="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500 hover:shadow-lg transition-shadow duration-300"
         >
@@ -124,30 +109,30 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow-md p-6 col-span-1">
+        <div class="bg-white rounded-xl shadow-md p-6 col-span-1 lg:col-span-1">
           <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">
-            <i class="fas fa-chart-pie mr-2 text-indigo-500"></i>Risk Ratio
+            <i class="fas fa-chart-pie mr-2 text-indigo-500"></i>
+            Risk Distribution
           </h3>
 
-          <div class="relative w-full" style="height: 300px">
+          <div class="relative h-96 w-full">
             <canvas id="riskPieChart"></canvas>
           </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-md p-6 col-span-1 lg:col-span-2">
           <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">
-            <i class="fas fa-chart-line mr-2 text-indigo-500"></i>Score vs
-            Clicks
+            <i class="fas fa-chart-pie mr-2 text-indigo-500"></i>
+            Score vs. Interaction
           </h3>
-          <div class="relative h-64 w-full">
+
+          <div class="relative h-96 w-full">
             <canvas id="scatterChart"></canvas>
           </div>
         </div>
       </div>
 
-      <div class="text-center text-gray-400 text-sm pb-6">
-        &copy; 2026 Big Data Project - IE400.F13
-      </div>
+      {% include 'footer.html' %}
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

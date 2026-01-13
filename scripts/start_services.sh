@@ -1,43 +1,34 @@
 #!/bin/bash
 
-# scripts/start_services.sh
-
-echo "------------------------------------------------------------"
-echo ">>> [SYSTEM] KIỂM TRA VÀ KHỞI ĐỘNG HẠ TẦNG..."
-
-# 1. KIỂM TRA HADOOP (NameNode)
-# Hadoop khởi động lâu nên ta chỉ bật nếu nó chưa chạy
+# Hadoop takes a while to start, so we only start it if it's not running
 if ! jps | grep -q "NameNode"; then
-    echo ">>> [START] Đang khởi động Hadoop (HDFS)..."
+    echo ">>> [START] Starting Hadoop (HDFS)..."
     start-all.sh
 else
-    echo "✔ Hadoop (HDFS) đã đang chạy."
+    echo "✔ Hadoop (HDFS) is already running."
 fi
 
-# 2. KIỂM TRA HBASE (HMaster)
-# Tương tự, chỉ bật nếu chưa chạy
+# Similarly, only start if not running
 if ! jps | grep -q "HMaster"; then
-    echo ">>> [START] Đang khởi động HBase..."
+    echo ">>> [START] Starting HBase..."
     start-hbase.sh
 else
-    echo "✔ HBase Master đã đang chạy."
+    echo "✔ HBase Master is already running."
 fi
 
-# 3. XỬ LÝ HBASE THRIFT (QUAN TRỌNG: FORCE RESTART)
-# Với Thrift, ta luôn Kill và Bật lại để tránh lỗi "Broken Pipe" hoặc "Timeout"
-echo ">>> [RESET] Đang làm mới HBase Thrift Server..."
+# For Thrift, we always Kill and Restart to avoid "Broken Pipe" or "Timeout" errors
+echo ">>> [RESET] Refreshing HBase Thrift Server..."
 
-# a. Tìm và diệt tiến trình Thrift cũ (nếu có)
-# 'xargs -r' để không báo lỗi nếu không tìm thấy pid nào
+# Find and kill old Thrift process (if any)
+# 'xargs -r' prevents errors if no pid is found
 jps | grep ThriftServer | awk '{print $1}' | xargs -r kill -9 2>/dev/null
 
-# b. Đợi hệ điều hành giải phóng cổng (quan trọng)
-echo "    -> Đang đợi giải phóng cổng 9090..."
+# Wait for OS to release the port (important)
+echo "    -> Waiting for port 9090 release..."
 sleep 2
 
-# c. Khởi động lại
-echo ">>> [START] Khởi động Thrift Server mới (Port 9090)..."
+# Restart
+echo ">>> [START] Starting new Thrift Server (Port 9090)..."
 hbase thrift start -p 9090 --infoport 9095 > /dev/null 2>&1 &
 
-echo "✔ Đã gửi lệnh khởi động Thrift."
-echo "------------------------------------------------------------"
+echo "✔ Thrift start command sent."

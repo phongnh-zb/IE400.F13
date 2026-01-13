@@ -1,19 +1,19 @@
-# configs/config.py
 import os
 
+# Java Home Configuration (Adjust if your path differs)
 JAVA_17_HOME = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
 
-# --- CẤU HÌNH HDFS (Dùng cho Pipeline tự động) ---
-# Địa chỉ HDFS mặc định
+# --- HDFS CONFIGURATION (Used for Automated Pipeline) ---
+# Default HDFS Address
 HDFS_NAMENODE = "hdfs://localhost:9000"
 
-# Đường dẫn Input (Nơi setup_hdfs.sh đã upload file lên)
+# Input Path (Where setup_hdfs.sh uploaded the raw files)
 HDFS_BASE_PATH = f"{HDFS_NAMENODE}/user/ie400/oulad_raw/"
 
-# Đường dẫn Output (Nơi etl_job.py sẽ lưu file sau xử lý)
+# Output Path (Where etl_job.py will save processed files)
 HDFS_OUTPUT_PATH = f"{HDFS_NAMENODE}/user/ie400/oulad_processed/"
 
-# Tên các file
+# File Names
 FILE_STUDENT_INFO = "studentInfo.csv"
 FILE_STUDENT_VLE = "studentVle.csv"
 FILE_STUDENT_ASSESSMENT = "studentAssessment.csv"

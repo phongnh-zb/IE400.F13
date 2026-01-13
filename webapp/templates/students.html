@@ -9,25 +9,28 @@
 </head>
 <body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
 
-    <nav class="bg-gradient-to-r from-blue-800 to-indigo-900 shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <a href="/" class="text-white text-xl font-bold"><i class="fas fa-network-wired"></i> BIG DATA MONITOR</a>
-            <div class="flex space-x-4">
-                <a href="/" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium">Dashboard</a>
-                <a href="/students" class="bg-white/10 text-white px-3 py-2 rounded-md text-sm font-medium border border-white/20">Student List</a>
-            </div>
-        </div>
-    </nav>
+    {% set active_page = 'students' %}
+    {% include 'navbar.html' %}
 
     <main class="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
         
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-800">Dữ liệu Sinh viên</h2>
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800">Student Management</h2>
+                        
+                        <button id="refreshBtn" onclick="triggerManualRefresh()" 
+                                class="flex items-center gap-2 px-3 py-1 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition shadow-sm"
+                                title="Force update data from HBase">
+                            <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                            Refresh Data 
+                        </button>
+                    </div>
+
                     <p class="text-sm text-gray-500">
-                        Cập nhật lúc: <span class="font-bold text-blue-600">{{ last_updated }}</span> 
-                        | Tổng: <span class="font-bold">{{ total_records }}</span> bản ghi
+                        Last updated: <span class="font-bold text-blue-600">{{ last_updated }}</span> 
+                        | Total: <span class="font-bold">{{ total_records }}</span> records
                     </p>
                 </div>
 
@@ -39,10 +42,10 @@
                     <div class="relative w-full">
                         <input type="text" name="search" value="{{ search }}" 
                                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
-                               placeholder="Tìm ID sinh viên...">
+                               placeholder="Search Student ID...">
                         <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                     </div>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Tìm</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Search</button>
                 </form>
             </div>
         </div>
@@ -50,46 +53,54 @@
         <div class="bg-white shadow-md rounded-xl overflow-hidden border border-gray-200">
             <div class="overflow-x-auto min-h-[400px]">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-100">
+                   <thead class="bg-gray-100 border-b border-gray-200">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition group"
                                 onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=id&order={{ 'desc' if sort_by == 'id' and order == 'asc' else 'asc' }}'">
-                                Student ID
-                                {% if sort_by == 'id' %}
-                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
-                                {% endif %}
+                                <div class="flex items-center gap-2">
+                                    Student ID
+                                    {% if sort_by == 'id' %}
+                                        <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} text-blue-600"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-gray-300 opacity-0 group-hover:opacity-100 transition"></i>
+                                    {% endif %}
+                                </div>
                             </th>
 
-                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                            <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition group"
                                 onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=clicks&order={{ 'desc' if sort_by == 'clicks' and order == 'asc' else 'asc' }}'">
-                                Clicks
-                                {% if sort_by == 'clicks' %}
-                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
-                                {% endif %}
+                                <div class="flex items-center justify-center gap-2">
+                                    Engagement (Clicks)
+                                    {% if sort_by == 'clicks' %}
+                                        <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} text-blue-600"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-gray-300 opacity-0 group-hover:opacity-100 transition"></i>
+                                    {% endif %}
+                                </div>
                             </th>
 
-                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                            <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition group"
                                 onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=score&order={{ 'desc' if sort_by == 'score' and order == 'asc' else 'asc' }}'">
-                                Score
-                                {% if sort_by == 'score' %}
-                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
-                                {% endif %}
+                                <div class="flex items-center justify-center gap-2">
+                                    Average Score
+                                    {% if sort_by == 'score' %}
+                                        <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} text-blue-600"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-gray-300 opacity-0 group-hover:opacity-100 transition"></i>
+                                    {% endif %}
+                                </div>
                             </th>
 
-                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 transition"
+                            <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition group"
                                 onclick="window.location.href='/students?page=1&page_size={{ page_size }}&search={{ search }}&sort_by=risk&order={{ 'desc' if sort_by == 'risk' and order == 'asc' else 'asc' }}'">
-                                Prediction
-                                {% if sort_by == 'risk' %}
-                                    <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} ml-1 text-blue-600"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
-                                {% endif %}
+                                <div class="flex items-center justify-center gap-2">
+                                    Risk Status
+                                    {% if sort_by == 'risk' %}
+                                        <i class="fas fa-sort-{{ 'down' if order == 'desc' else 'up' }} text-blue-600"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-gray-300 opacity-0 group-hover:opacity-100 transition"></i>
+                                    {% endif %}
+                                </div>
                             </th>
                         </tr>
                     </thead>
@@ -104,23 +115,28 @@
                                 </a>
                             </td>                            
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-center">{{ st.clicks | int }}</td>
-                            <td class="px-6 py-4 text-center">
-                                <span class="text-xs font-bold">{{ st.score | round(1) }}</span>
-                                <div class="w-24 bg-gray-200 rounded-full h-1.5 inline-block ml-2 align-middle">
-                                    <div class="bg-blue-500 h-1.5 rounded-full" style="width: {{ st.score }}%"></div>
+                            <td class="px-6 py-4 whitespace-nowrap align-middle">
+                                <div class="w-full max-w-[100px]">
+                                    <div class="flex justify-between text-xs mb-1">
+                                        <span class="font-bold">{{ st.score | round(1) }}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div class="{{ 'bg-red-500' if st.score < 40 else ('bg-yellow-400' if st.score < 70 else 'bg-green-500') }} h-1.5 rounded-full" 
+                                            style="width: {{ st.score }}%"></div>
+                                    </div>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-center">
                                 {% if st.risk == 1 %}
-                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Nguy cơ</span>
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">High Risk</span>
                                 {% else %}
-                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">An toàn</span>
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">Safe</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="px-6 py-10 text-center text-gray-500">Không tìm thấy dữ liệu.</td>
+                            <td colspan="4" class="px-6 py-10 text-center text-gray-500">No data found matching your criteria.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -130,8 +146,8 @@
             <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                 
                 <div class="flex items-center text-sm text-gray-700">
-                    <span class="mr-2">Hiển thị</span>
-                    <select onchange="changeParams('page_size', this.value)" class="border-gray-300 border rounded py-1 px-2 cursor-pointer focus:outline-none">
+                    <span class="mr-2">Show</span>
+                    <select onchange="changeParams('page_size', this.value)" class="border-gray-300 border rounded py-1 px-2 cursor-pointer focus:outline-none bg-white">
                         <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
                         <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
                         <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
@@ -140,7 +156,7 @@
                 </div>
 
                 <span class="text-sm text-gray-600">
-                    Trang <span class="font-bold text-gray-900">{{ page }}</span> / <span class="font-bold text-gray-900">{{ total_pages }}</span>
+                    Page <span class="font-bold text-gray-900">{{ page }}</span> of <span class="font-bold text-gray-900">{{ total_pages }}</span>
                 </span>
 
                 <div class="inline-flex rounded-md shadow-sm isolate">
@@ -152,12 +168,12 @@
 
                     <a href="{{ '/students?page=' ~ (page - 1) ~ '&page_size=' ~ page_size ~ '&search=' ~ search ~ '&sort_by=' ~ sort_by ~ '&order=' ~ order }}" 
                        class="relative inline-flex items-center px-3 py-2 text-gray-700 bg-white border-t border-b border-r border-gray-300 hover:bg-gray-50 {{ 'pointer-events-none opacity-50' if page == 1 }}">
-                        Trước
+                        Prev
                     </a>
 
                     <a href="{{ '/students?page=' ~ (page + 1) ~ '&page_size=' ~ page_size ~ '&search=' ~ search ~ '&sort_by=' ~ sort_by ~ '&order=' ~ order }}" 
                        class="relative inline-flex items-center px-3 py-2 text-gray-700 bg-white border-t border-b border-l border-gray-300 hover:bg-gray-50 {{ 'pointer-events-none opacity-50' if page == total_pages }}">
-                        Sau
+                        Next
                     </a>
 
                     <a href="{{ '/students?page=' ~ total_pages ~ '&page_size=' ~ page_size ~ '&search=' ~ search ~ '&sort_by=' ~ sort_by ~ '&order=' ~ order }}" 
@@ -170,6 +186,8 @@
         </div>
     </main>
 
+    {% include 'footer.html' %}
+
     <div id="studentModal" class="fixed inset-0 z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
 
@@ -179,13 +197,18 @@
                 <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
                     
                     <div id="modalHeader" class="bg-blue-600 h-24 relative transition-colors duration-300">
-                        <button onclick="closeModal()" class="absolute top-4 right-4 text-white hover:text-gray-200 focus:outline-none">
+                        
+                        <h3 class="absolute top-4 left-6 text-white font-bold text-lg tracking-wide flex items-center gap-2">
+                            Student Details
+                        </h3>
+
+                        <button onclick="closeModal()" class="absolute top-4 right-4 text-white hover:text-gray-200 focus:outline-none transition-transform hover:rotate-90">
                             <i class="fas fa-times text-xl"></i>
                         </button>
                         
                         <div class="absolute -bottom-10 left-6">
                             <div class="h-20 w-20 rounded-full bg-white p-1 shadow-md">
-                                <img id="modalAvatar" src="" class="h-full w-full rounded-full object-cover">
+                                <img id="modalAvatar" src="" class="h-full w-full rounded-full object-cover" alt="Student Avatar">
                             </div>
                         </div>
                     </div>
@@ -194,7 +217,6 @@
                         <div class="flex justify-between items-start">
                             <div>
                                 <h3 class="text-2xl font-bold text-gray-900" id="modalId">Student ID</h3>
-                                <p class="text-sm text-gray-500">Big Data Course</p>
                             </div>
                             <span id="modalStatusBadge" class="px-3 py-1 rounded-full text-xs font-bold border">
                                 Loading...
@@ -202,123 +224,39 @@
                         </div>
 
                         <div class="grid grid-cols-2 gap-4 mt-6">
-                            <div class="bg-gray-50 p-4 rounded-lg border">
-                                <p class="text-xs text-gray-500 uppercase font-bold">Điểm số</p>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                <p class="text-xs text-gray-500 uppercase font-bold tracking-wider">Average Score</p>
                                 <p class="text-2xl font-bold text-gray-800" id="modalScore">0</p>
-                                <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2 overflow-hidden">
                                     <div id="modalProgressBar" class="bg-blue-500 h-1.5 rounded-full" style="width: 0%"></div>
                                 </div>
                             </div>
-                            <div class="bg-gray-50 p-4 rounded-lg border">
-                                <p class="text-xs text-gray-500 uppercase font-bold">Clicks</p>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                <p class="text-xs text-gray-500 uppercase font-bold tracking-wider">Engagement (Clicks)</p>
                                 <p class="text-2xl font-bold text-gray-800" id="modalClicks">0</p>
+                                <p class="text-xs text-gray-400 mt-2">interactions recorded</p>
                             </div>
                         </div>
 
-                        <div class="mt-6 border-t pt-4">
-                            <h4 class="text-sm font-bold text-gray-800 flex items-center gap-2 mb-2">
-                                <i class="fas fa-robot text-indigo-500"></i> AI Đề xuất:
+                        <div class="mt-6 border-t border-gray-100 pt-5">
+                            <h4 class="text-sm font-bold text-gray-800 flex items-center gap-2 mb-3 uppercase tracking-wide">
+                                <i class="fas fa-clipboard-check text-indigo-600"></i> Risk Analysis & Action Plan
                             </h4>
-                            <ul id="modalRecs" class="text-sm text-gray-600 space-y-2 list-disc pl-5">
-                            </ul>
+                            
+                            <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                                <ul id="modalRecs" class="text-sm text-gray-700 space-y-2 list-disc pl-5">
+                                    </ul>
+                            </div>
                         </div>
                     </div>
                     
                     <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                        <button type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto" onclick="closeModal()">Đóng</button>
+                        <button type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto" onclick="closeModal()">Close</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    <script src="{{ url_for('static', filename='js/students.js') }}"></script>
 </body>
-
-<script>
-    // Đảm bảo code chỉ chạy khi HTML đã tải xong
-    document.addEventListener('DOMContentLoaded', () => {
-        
-        // --- 1. BIẾN & DOM ELEMENTS ---
-        const modal = document.getElementById('studentModal');
-        const modalOverlay = document.getElementById('modalOverlay');
-
-        // --- 2. HÀM MỞ MODAL ---
-        window.openStudentModal = async function(studentId) {
-            try {
-                // Fetch API
-                const response = await fetch(`/api/student/${studentId}`);
-                if (!response.ok) throw new Error("Student not found");
-                const data = await response.json();
-                const info = data.info;
-
-                // Điền thông tin cơ bản
-                document.getElementById('modalId').innerText = info.id;
-                document.getElementById('modalAvatar').src = `https://ui-avatars.com/api/?name=${info.id}&background=random&color=fff`;
-                document.getElementById('modalScore').innerText = info.score.toFixed(1);
-                document.getElementById('modalClicks').innerText = parseInt(info.clicks);
-
-                // Điền thông tin Giao diện (Màu sắc theo Risk)
-                const header = document.getElementById('modalHeader');
-                const badge = document.getElementById('modalStatusBadge');
-                const progressBar = document.getElementById('modalProgressBar');
-
-                if (info.risk === 1) {
-                    header.className = "bg-red-600 h-24 relative transition-colors duration-300";
-                    badge.className = "px-3 py-1 rounded-full text-xs font-bold border bg-red-100 text-red-800 border-red-200";
-                    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> NGUY CƠ';
-                    progressBar.className = "bg-red-500 h-1.5 rounded-full";
-                } else {
-                    header.className = "bg-green-600 h-24 relative transition-colors duration-300";
-                    badge.className = "px-3 py-1 rounded-full text-xs font-bold border bg-green-100 text-green-800 border-green-200";
-                    badge.innerHTML = '<i class="fas fa-check-circle"></i> AN TOÀN';
-                    progressBar.className = "bg-green-500 h-1.5 rounded-full";
-                }
-                
-                progressBar.style.width = `${info.score}%`;
-
-                // Điền Recommendations
-                const recList = document.getElementById('modalRecs');
-                recList.innerHTML = '';
-                data.recommendations.forEach(rec => {
-                    const li = document.createElement('li');
-                    li.innerText = rec;
-                    recList.appendChild(li);
-                });
-
-                // Hiển thị Modal
-                modal.classList.remove('hidden');
-
-            } catch (err) {
-                console.error(err);
-                alert("Lỗi tải dữ liệu: " + err);
-            }
-        };
-
-        // --- 3. HÀM ĐÓNG MODAL ---
-        window.closeModal = function() {
-            modal.classList.add('hidden');
-        };
-
-        // --- 4. SỰ KIỆN CLICK RA NGOÀI (Overlay) ---
-        if (modalOverlay) {
-            modalOverlay.addEventListener('click', function(e) {
-                // e.target: Phần tử bị click
-                // this: Chính là modalOverlay
-                
-                // Logic: Nếu click vào overlay HOẶC click vào wrapper canh giữa (do cấu trúc flex của Tailwind)
-                if (e.target === this || e.target.classList.contains('min-h-full')) {
-                    closeModal();
-                }
-            });
-        } else {
-            console.error("Không tìm thấy element id='modalOverlay'. Hãy kiểm tra lại HTML.");
-        }
-
-        // --- 5. SỰ KIỆN PHÍM ESC ---
-        document.addEventListener('keydown', function(event) {
-            if (event.key === "Escape") {
-                closeModal();
-            }
-        });
-    });
-</script>
 </html>

@@ -1,5 +1,5 @@
-# src/utils.py
 from pyspark.sql import SparkSession
+
 
 def get_spark_session(app_name, master="local[*]"):
     spark = SparkSession.builder \
@@ -7,6 +7,6 @@ def get_spark_session(app_name, master="local[*]"):
         .master(master) \
         .getOrCreate()
     
-    # Giảm log rác
+    # Reduce log verbosity (Suppress INFO logs)
     spark.sparkContext.setLogLevel("ERROR")
     return spark

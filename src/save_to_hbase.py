@@ -4,7 +4,7 @@ import time
 
 import happybase
 
-# Setup đường dẫn import
+# Setup import path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from configs import config
@@ -12,52 +12,56 @@ from src.utils import get_spark_session
 
 
 def main():
-    # 1. Khởi tạo Spark
+    # Initialize Spark
     spark = get_spark_session("Save_To_HBase_Full", config.MASTER)
     spark.sparkContext.setLogLevel("ERROR")
 
     print(f">>> [HBASE] Reading processed data from HDFS: {config.HDFS_OUTPUT_PATH}")
     
     try:
-        # Đọc dữ liệu Parquet từ HDFS
+        # Read Parquet data from HDFS
         df = spark.read.parquet(config.HDFS_OUTPUT_PATH)
         
-        # --- QUAN TRỌNG: Đếm tổng số dòng để theo dõi ---
+        # --- IMPORTANT: Count total rows for tracking ---
         total_count = df.count()
-        print(f">>> [INFO] Tìm thấy tổng cộng {total_count} dòng dữ liệu.")
+        print(f">>> [INFO] Found total {total_count} rows of data.")
         
-        # Thu thập toàn bộ dữ liệu về Driver (Lưu ý: Với Big Data thật sự lớn >1GB, không được dùng collect())
-        # Với 32k dòng của OULAD thì collect() vẫn ổn.
+        # Collect all data to Driver 
         all_rows = df.select("id_student", "total_clicks", "avg_score", "label").collect()
-        
     except Exception as e:
-        print(f">>> LỖI: Không tìm thấy dữ liệu hoặc lỗi đọc HDFS: {e}")
+        print(f">>> ERROR: Data not found or HDFS read error: {e}")
         sys.exit(1)
 
     print(">>> [HBASE] Connecting to HBase via Thrift...")
     connection = None
+    
     try:
-        connection = happybase.Connection('localhost', port=9090, timeout=10000) # Tăng timeout
+        connection = happybase.Connection('localhost', port=9090, timeout=10000)
         table = connection.table('student_predictions')
         
-        print(f">>> [HBASE] Bắt đầu ghi {total_count} dòng vào bảng 'student_predictions'...")
+        print(f">>> [HBASE] Starting to write {total_count} rows to table 'student_predictions'...")
         
-        # Sử dụng Batch để ghi nhanh hơn
         batch = table.batch(batch_size=1000)
         start_time = time.time()
         
         for i, row in enumerate(all_rows):
             row_key = str(row['id_student']).encode()
             
-            # Lấy giá trị gốc từ Spark
+            # Get original values from Spark
             clicks = float(row['total_clicks'])
             score = float(row['avg_score'])
-            risk_label = int(row['label']) # Đây là label do model dự đoán
+            risk_label = int(row['label']) # Model prediction
             
-            # --- LOGIC CAN THIỆP (OVERRIDE) ---
-            # Nếu điểm > 90, ép về trạng thái An toàn (0) bất kể Model nói gì
+            # --- BUSINESS RULES (OVERRIDES) ---
+            
+            # Rule 1: High Achievers are always Safe
             if score >= 90.0:
                 risk_label = 0 
+                
+            # Rule 2: Low Activity/Score is always High Risk (Fix for 0/0 case)
+            elif score < 40.0 or clicks < 10:
+                risk_label = 1
+                
             # ----------------------------------
 
             batch.put(row_key, {
@@ -66,14 +70,12 @@ def main():
                 b'prediction:risk_label': str(risk_label).encode()
             })
 
-        # Gửi những dòng còn lại trong batch
         batch.send()
         
         duration = time.time() - start_time
-        print(f">>> [HBASE] ✅ HOÀN TẤT! Đã ghi {total_count} dòng trong {duration:.2f} giây.")
-        
+        print(f">>> [HBASE] ✅ COMPLETED! Wrote {total_count} rows in {duration:.2f} seconds.")
     except Exception as e:
-        print(f">>> [HBASE] LỖI KẾT NỐI/GHI DỮ LIỆU: {e}")
+        print(f">>> [HBASE] CONNECTION/WRITE ERROR: {e}")
     finally:
         if connection:
             connection.close()

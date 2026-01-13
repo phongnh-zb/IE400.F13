@@ -1,193 +1,162 @@
-/**
- * students.js
- * Xử lý logic cho trang Danh sách sinh viên:
- * - Client-side Pagination (Phân trang)
- * - Filtering (Lọc theo Status & Search ID)
- * - URL Synchronization (Đồng bộ trạng thái lên URL)
- */
-
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("Students Manager Loaded successfully.");
+  console.log("Student Logic Loaded.");
 
-  // --- 1. DOM ELEMENTS ---
-  const searchInput = document.getElementById("studentSearch");
-  const statusFilter = document.getElementById("statusFilter");
-  const tableBody = document.getElementById("studentTableBody");
-  const noResultsDiv = document.getElementById("noResults");
-  const pageSizeSelect = document.getElementById("pageSizeSelect");
+  // --- DOM ELEMENTS ---
+  const modal = document.getElementById("studentModal");
+  const modalOverlay = document.getElementById("modalOverlay");
+  const searchInput = document.querySelector('input[name="search"]');
 
-  // Pagination Elements
-  const startRowEl = document.getElementById("startRow");
-  const endRowEl = document.getElementById("endRow");
-  const totalRowsEl = document.getElementById("totalRows");
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
-
-  // Lấy toàn bộ dòng dữ liệu gốc từ HTML ban đầu
-  const allRows = Array.from(tableBody.getElementsByTagName("tr"));
-
-  // --- 2. INIT STATE FROM URL ---
-  // Đọc tham số từ URL để giữ trạng thái khi reload hoặc back
-  const urlParams = new URLSearchParams(window.location.search);
-
-  let currentPage = parseInt(urlParams.get("page")) || 1;
-  let rowsPerPage = parseInt(urlParams.get("page_size")) || 10;
-
-  // Set giá trị mặc định cho dropdown đúng với URL
-  if (pageSizeSelect) pageSizeSelect.value = rowsPerPage;
-
-  // Danh sách sau khi lọc (Ban đầu bằng danh sách gốc)
-  let filteredRows = [...allRows];
-
-  // --- 3. CORE FUNCTIONS ---
-
-  /**
-   * Cập nhật URL trình duyệt mà không reload trang
-   */
-  function updateURL() {
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.set("page", currentPage);
-    newUrl.searchParams.set("page_size", rowsPerPage);
-
-    // Dùng pushState để lưu history
-    window.history.pushState({ path: newUrl.href }, "", newUrl.href);
-  }
-
-  /**
-   * Render bảng dựa trên currentPage và filteredRows
-   */
-  function renderTable() {
-    // 1. Ẩn tất cả dòng trước
-    allRows.forEach((row) => (row.style.display = "none"));
-
-    const totalItems = filteredRows.length;
-    const totalPages = Math.ceil(totalItems / rowsPerPage);
-
-    // Validate trang hiện tại (tránh trường hợp đang ở trang 5 lọc còn 1 trang)
-    if (currentPage < 1) currentPage = 1;
-    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
-    if (totalItems === 0) currentPage = 1;
-
-    // 2. Tính toán các dòng cần hiện (Slice)
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    const visibleRows = filteredRows.slice(start, end);
-
-    // 3. Hiển thị các dòng trong range
-    visibleRows.forEach((row) => (row.style.display = ""));
-
-    // 4. Xử lý Empty State (Không có kết quả)
-    if (totalItems === 0) {
-      noResultsDiv.style.display = "flex"; // Hiện thông báo
-      tableBody.parentElement.style.minHeight = "auto";
-    } else {
-      noResultsDiv.style.display = "none";
+  // --- HELPER: URL PARAMETER MANAGEMENT ---
+  window.changeParams = function (key, value) {
+    const url = new URL(window.location.href);
+    url.searchParams.set(key, value);
+    if (key === "page_size") {
+      url.searchParams.set("page", 1);
     }
+    window.location.href = url.toString();
+  };
 
-    // 5. Cập nhật Text thống kê
-    startRowEl.innerText = totalItems === 0 ? 0 : start + 1;
-    endRowEl.innerText = end > totalItems ? totalItems : end;
-    totalRowsEl.innerText = totalItems;
-
-    // 6. Cập nhật trạng thái nút bấm
-    prevBtn.disabled = currentPage === 1;
-    nextBtn.disabled = currentPage >= totalPages || totalPages === 0;
+  // --- AUTO-SEARCH LOGIC ---
+  if (searchInput) {
+    // Restore Focus: If user was searching, put cursor back at the end of text
+    if (searchInput.value) {
+      searchInput.focus();
+      const val = searchInput.value;
+      searchInput.value = "";
+      searchInput.value = val;
+    }
   }
 
-  /**
-   * Hàm lọc dữ liệu (Gọi khi Search hoặc chọn Dropdown Status)
-   */
-  function filterData() {
-    const searchText = searchInput
-      ? searchInput.value.toLowerCase().trim()
-      : "";
-    const statusValue = statusFilter ? statusFilter.value : "all";
+  // --- MODAL FUNCTIONS ---
+  window.openStudentModal = async function (studentId) {
+    try {
+      const response = await fetch(`/api/student/${studentId}`);
+      if (!response.ok) throw new Error("Student not found");
+      const data = await response.json();
+      const info = data.info;
 
-    filteredRows = allRows.filter((row) => {
-      // Cột 1: ID, Cột 4: Status (index tính từ 0)
-      const cells = row.getElementsByTagName("td");
-      if (!cells || cells.length < 5) return false;
+      document.getElementById("modalId").innerText = info.id;
+      document.getElementById(
+        "modalAvatar"
+      ).src = `https://ui-avatars.com/api/?name=${info.id}&background=random&color=fff`;
+      document.getElementById("modalScore").innerText = info.score.toFixed(1);
+      document.getElementById("modalClicks").innerText = parseInt(info.clicks);
 
-      const idText = cells[1].textContent || cells[1].innerText;
-      const statusText = cells[4].textContent || cells[4].innerText;
+      const header = document.getElementById("modalHeader");
+      const badge = document.getElementById("modalStatusBadge");
+      const progressBar = document.getElementById("modalProgressBar");
 
-      // 1. Check Search Text (ID)
-      const matchesSearch = idText.toLowerCase().includes(searchText);
-
-      // 2. Check Status
-      let matchesStatus = true;
-      if (statusValue === "risk") {
-        // Kiểm tra xem text có chứa từ khóa của Risk không
-        matchesStatus = statusText.includes("Nguy cơ");
-      } else if (statusValue === "safe") {
-        matchesStatus = statusText.includes("An toàn");
+      // --- RISK STYLING (For Header & Badge) ---
+      if (info.risk === 1) {
+        header.className =
+          "bg-red-600 h-24 relative transition-colors duration-300";
+        badge.className =
+          "px-3 py-1 rounded-full text-xs font-bold border bg-red-100 text-red-800 border-red-200";
+        badge.innerHTML =
+          '<i class="fas fa-exclamation-triangle"></i> HIGH RISK';
+      } else {
+        header.className =
+          "bg-green-600 h-24 relative transition-colors duration-300";
+        badge.className =
+          "px-3 py-1 rounded-full text-xs font-bold border bg-green-100 text-green-800 border-green-200";
+        badge.innerHTML = '<i class="fas fa-check-circle"></i> SAFE';
       }
 
-      return matchesSearch && matchesStatus;
-    });
+      // --- SCORE STYLING (For Progress Bar - MATCHING TABLE LIST) ---
+      // Logic: Red (<40), Yellow (<70), Green (>=70)
+      let barColor = "bg-green-500"; // Default Green
 
-    // Reset về trang 1 mỗi khi lọc dữ liệu
-    currentPage = 1;
-    updateURL();
-    renderTable();
+      if (info.score < 40) {
+        barColor = "bg-red-500";
+      } else if (info.score < 70) {
+        barColor = "bg-yellow-400";
+      }
+
+      // Apply Width and Color
+      progressBar.className = `${barColor} h-1.5 rounded-full transition-all duration-500`;
+      progressBar.style.width = `${info.score}%`;
+
+      // --- RECOMMENDATIONS ---
+      const recList = document.getElementById("modalRecs");
+      recList.innerHTML = "";
+      data.recommendations.forEach((rec) => {
+        const li = document.createElement("li");
+        li.innerText = rec;
+        recList.appendChild(li);
+      });
+
+      modal.classList.remove("hidden");
+    } catch (err) {
+      console.error(err);
+      alert("Error loading student data: " + err);
+    }
+  };
+
+  window.closeModal = function () {
+    modal.classList.add("hidden");
+  };
+
+  // Attached to window so it can be called from HTML
+  window.triggerManualRefresh = async function () {
+    const btn = document.getElementById("refreshBtn");
+    const icon = document.getElementById("refreshIcon");
+
+    // UI Loading State
+    if (btn && icon) {
+      btn.disabled = true;
+      btn.classList.add("opacity-50", "cursor-not-allowed");
+      icon.classList.add("fa-spin");
+      // Maintain width to prevent layout jump
+      btn.style.minWidth = btn.offsetWidth + "px";
+      btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Updating...`;
+    }
+
+    try {
+      console.log("Requesting manual cache update...");
+      const response = await fetch("/api/refresh-cache", { method: "POST" });
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log("Cache updated:", result.message);
+        window.location.reload();
+      } else {
+        console.error("Refresh failed:", result.message);
+        alert("Failed to refresh data. Please try again.");
+
+        // RESET BUTTON STATE ON ERROR
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove("opacity-50", "cursor-not-allowed");
+          // UPDATED: Make sure this text matches the HTML
+          btn.innerHTML = `<i class="fas fa-sync-alt"></i> Refresh Data`;
+        }
+      }
+    } catch (error) {
+      console.error("Network error during refresh:", error);
+      alert("Network error. Could not reach server.");
+
+      // RESET BUTTON STATE ON ERROR
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
+        // UPDATED: Make sure this text matches the HTML
+        btn.innerHTML = `<i class="fas fa-sync-alt"></i> Refresh Data`;
+      }
+    }
+  };
+
+  // --- EVENT LISTENERS ---
+  if (modalOverlay) {
+    modalOverlay.addEventListener("click", function (e) {
+      if (e.target === this || e.target.classList.contains("min-h-full")) {
+        closeModal();
+      }
+    });
   }
 
-  // --- 4. EVENT LISTENERS ---
-
-  // Nút Previous
-  prevBtn.addEventListener("click", () => {
-    if (currentPage > 1) {
-      currentPage--;
-      updateURL();
-      renderTable();
-      // Scroll nhẹ lên đầu bảng cho user dễ nhìn
-      document.querySelector(".overflow-x-auto").scrollTop = 0;
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeModal();
     }
   });
-
-  // Nút Next
-  nextBtn.addEventListener("click", () => {
-    const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
-    if (currentPage < totalPages) {
-      currentPage++;
-      updateURL();
-      renderTable();
-      document.querySelector(".overflow-x-auto").scrollTop = 0;
-    }
-  });
-
-  // Thay đổi số dòng hiển thị (Page Size)
-  if (pageSizeSelect) {
-    pageSizeSelect.addEventListener("change", (e) => {
-      rowsPerPage = parseInt(e.target.value);
-      currentPage = 1; // Reset về trang 1
-      updateURL();
-      renderTable();
-    });
-  }
-
-  // Sự kiện Search & Filter
-  if (searchInput) {
-    searchInput.addEventListener("keyup", filterData);
-    // Xử lý nút 'x' clear trong ô input search (nếu trình duyệt hỗ trợ)
-    searchInput.addEventListener("search", filterData);
-  }
-
-  if (statusFilter) {
-    statusFilter.addEventListener("change", filterData);
-  }
-
-  // Sự kiện nút Back/Forward của trình duyệt (Popstate)
-  window.addEventListener("popstate", () => {
-    const params = new URLSearchParams(window.location.search);
-    currentPage = parseInt(params.get("page")) || 1;
-    rowsPerPage = parseInt(params.get("page_size")) || 10;
-
-    if (pageSizeSelect) pageSizeSelect.value = rowsPerPage;
-    renderTable();
-  });
-
-  // --- 5. INITIAL RENDER ---
-  // Chạy bộ lọc lần đầu (để đề phòng trường hợp ô input đang có sẵn text do browser cache)
-  filterData();
 });
